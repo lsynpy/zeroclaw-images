@@ -79,13 +79,13 @@ jobs:
           # Build with ci profile (fastest: lto=thin, codegen-units=16)
           cross build --profile ci \
             --target aarch64-unknown-linux-gnu \
-            --bin zeroclaw-daemon \
+            --bin zeroclaw \
             --no-default-features \
             --features "${FEATURES}"
 
           END=$(date +%s)
           DURATION=$((END - START))
-          BINARY_SIZE=$(stat -c%s target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon)
+          BINARY_SIZE=$(stat -c%s target/aarch64-unknown-linux-gnu/ci/zeroclaw)
           BINARY_SIZE_HUMAN=$(numfmt --to=iec $BINARY_SIZE)
 
           echo "duration=${DURATION}" >> "$GITHUB_OUTPUT"
@@ -94,7 +94,7 @@ jobs:
 
           # Save binary with variant name
           mkdir -p /tmp/artifact
-          cp target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon \
+          cp target/aarch64-unknown-linux-gnu/ci/zeroclaw \
             /tmp/artifact/zeroclaw-daemon-${VARIANT}
 
       - name: Upload variant artifact
