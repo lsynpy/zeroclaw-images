@@ -1,11 +1,14 @@
-# Cross-compile ZeroClaw daemon for aarch64
-# ==========================================
-# Downloads ZeroClaw source at the specified tag,
-# cross-compiles for ARM64, and uploads the binary
-# to our own releases so Dockerfiles can fetch it.
+# Cross-Compile ZeroClaw — Three variants in parallel
+# ====================================================
+# Builds three variants of zeroclaw-daemon for aarch64:
 #
-# Trigger: manual (workflow_dispatch) with a version tag.
-#          Also runs on pushes to main that change this file.
+#   A — Minimal:         core + lark only
+#   B — Default-NoChan:  default subsystems + lark only
+#   C — Default+Feishu:  full default + feishu
+#
+# Each variant is cross-compiled in parallel. Times and sizes
+# are captured for comparison. All binaries are uploaded to
+# a single release with distinct names.
 
 name: Cross-Compile ZeroClaw
 
@@ -13,19 +16,32 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'ZeroClaw version tag to compile (e.g. v0.8.0-beta-2)'
+        description: 'ZeroClaw version tag (e.g. v0.8.0-beta-2)'
         required: true
         type: string
-      features:
-        description: 'Cargo feature flags (comma-separated)'
-        required: false
-        default: 'lark,telegram,discord,signal,matrix'
 
 jobs:
+  # ── Parallel compilation matrix ──
   compile:
-    name: Build zeroclaw-daemon (aarch64)
+    name: ${{ matrix.variant.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+
+    strategy:
+      fail-fast: false      # don't cancel others if one fails
+      matrix:
+        variant:
+          - name: minimal
+            label: "A — Minimal"
+            features: "agent-runtime,gateway,channel-lark"
+
+          - name: default-nochan
+            label: "B — Default-NoChan"
+            features: "agent-runtime,acp-bridge,gateway,observability-prometheus,schema-export,channel-lark"
+
+          - name: default-feishu
+            label: "C — Default+Feishu"
+            features: "channel-lark"
 
     steps:
       - name: Checkout repo
@@ -39,61 +55,160 @@ jobs:
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Build zeroclaw-daemon
+      - name: Cross-compile
+        id: build
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+          VARIANT: ${{ matrix.variant.name }}
+          FEATURES: ${{ matrix.variant.features }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          FEATURES="${{ github.event.inputs.features }}"
+          START=$(date +%s)
 
-          echo "Building ZeroClaw ${VERSION} with features: ${FEATURES}"
+          echo "=== Variant: ${VARIANT} ==="
+          echo "Version: ${VERSION}"
           echo "Target: aarch64-unknown-linux-gnu"
+          echo "Features: ${FEATURES}"
+          echo "Profile: ci"
 
+          # Clone source
           git clone --depth 1 --branch "${VERSION}" \
             https://github.com/zeroclaw-labs/zeroclaw.git /tmp/zeroclaw
 
           cd /tmp/zeroclaw
 
-          cross build --release \
+          # Build with ci profile (fastest: lto=thin, codegen-units=16)
+          cross build --profile ci \
             --target aarch64-unknown-linux-gnu \
             --bin zeroclaw-daemon \
-            --features "${FEATURES//,/ }"
+            --no-default-features \
+            --features "${FEATURES}"
 
+          END=$(date +%s)
+          DURATION=$((END - START))
+          BINARY_SIZE=$(stat -c%s target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon)
+          BINARY_SIZE_HUMAN=$(numfmt --to=iec $BINARY_SIZE)
+
+          echo "duration=${DURATION}" >> "$GITHUB_OUTPUT"
+          echo "binary_size=${BINARY_SIZE}" >> "$GITHUB_OUTPUT"
+          echo "binary_size_human=${BINARY_SIZE_HUMAN}" >> "$GITHUB_OUTPUT"
+
+          # Save binary with variant name
           mkdir -p /tmp/artifact
-          cp target/aarch64-unknown-linux-gnu/release/zeroclaw-daemon \
-            /tmp/artifact/zeroclaw-daemon
+          cp target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon \
+            /tmp/artifact/zeroclaw-daemon-${VARIANT}
 
-      - name: Upload binary as workflow artifact
+      - name: Upload variant artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zeroclaw-daemon-${{ github.event.inputs.version }}
-          path: /tmp/artifact/zeroclaw-daemon
+          name: zeroclaw-daemon-${{ matrix.variant.name }}-${{ github.event.inputs.version }}
+          path: /tmp/artifact/zeroclaw-daemon-${{ matrix.variant.name }}
 
-      - name: Create or update release
+      - name: Print timing
+        run: |
+          MINS=$((${{ steps.build.outputs.duration }} / 60))
+          SECS=$((${{ steps.build.outputs.duration }} % 60))
+          echo "::notice::[${{ matrix.variant.label }}] ${MINS}m ${SECS}s — ${{ steps.build.outputs.binary_size_human }}"
+
+  # ── Consolidate: collect all binaries → single release ──
+  release:
+    name: Publish release
+    needs: compile
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all variant artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/binaries
+          merge-multiple: true
+
+      - name: List binaries
+        run: |
+          echo "Collected binaries:"
+          ls -lh /tmp/binaries/
+
+      - name: Create release and upload
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ github.event.inputs.version }}"
           RELEASE_TAG="zeroclaw-daemon-${VERSION}"
-          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
 
-          NOTES="Cross-compiled zeroclaw-daemon for aarch64. Features: ${{ github.event.inputs.features }}."
+          # Build summary table
+          SUMMARY="## Build Results\n\n"
+          SUMMARY+="| Variant | Features | Time | Binary Size | Status |\n"
+          SUMMARY+="|---------|----------|------|-------------|--------|\n"
 
+          for f in /tmp/binaries/*; do
+            VARIANT=$(basename "$f" | sed 's/zeroclaw-daemon-//')
+            SIZE=$(stat -c%s "$f" | numfmt --to=iec)
+
+            # Map variant name to label + features
+            case "$VARIANT" in
+              minimal)
+                LABEL="A — Minimal"
+                FEATS="\`agent-runtime,gateway,channel-lark\`"
+                STATUS="✅"
+                ;;
+              default-nochan)
+                LABEL="B — Default-NoChan"
+                FEATS="\`agent-runtime,acp-bridge,gateway,observability-prometheus,schema-export,channel-lark\`"
+                STATUS="✅"
+                ;;
+              default-feishu)
+                LABEL="C — Default+Feishu"
+                FEATS="Default + \`channel-lark\`"
+                STATUS="✅"
+                ;;
+              *)
+                LABEL="$VARIANT"
+                FEATS="—"
+                STATUS="?"
+                ;;
+            esac
+
+            SUMMARY+="| ${LABEL} | ${FEATS} | — | ${SIZE} | ${STATUS} |\n"
+          done
+
+          # Create release
           gh release view "${RELEASE_TAG}" 2>/dev/null || \
             gh release create "${RELEASE_TAG}" \
               --title "ZeroClaw daemon ${VERSION}" \
-              --notes "${NOTES}"
+              --notes "$(printf "${SUMMARY}")"
 
-          gh release upload "${RELEASE_TAG}" \
-            /tmp/artifact/zeroclaw-daemon --clobber
+          # Upload each binary to the same release
+          for f in /tmp/binaries/*; do
+            gh release upload "${RELEASE_TAG}" "$f" --clobber
+          done
 
-      - name: Summarize
-        env:
-          VERSION: ${{ github.event.inputs.version }}
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish summary
         run: |
-          echo "## ✅ Cross-compile complete" >> "$GITHUB_STEP_SUMMARY"
+          VERSION="${{ github.event.inputs.version }}"
+          TAG="${{ steps.release.outputs.release_tag }}"
+
+          echo "## ⏱ Build Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Version | \`${VERSION}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Features | \`${{ github.event.inputs.features }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Binary size | $(du -h /tmp/artifact/zeroclaw-daemon | cut -f1) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "Three variants of \`zeroclaw-daemon\` have been cross-compiled." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| # | Variant | Feature Set |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---------|-------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| A | Minimal | \`agent-runtime,gateway,channel-lark\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| B | Default-NoChan | default subsystems + \`channel-lark\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| C | Default+Feishu | official default + \`channel-lark\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Release:** [${TAG}](https://github.com/${{ github.repository }}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Check individual job logs for build times. Then deploy to JDC and test:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "# Download a variant and test locally" >> "$GITHUB_STEP_SUMMARY"
+          echo "gh release download zeroclaw-daemon-${VERSION} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -p zeroclaw-daemon-minimal \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -o ./zeroclaw-daemon && chmod +x ./zeroclaw-daemon" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

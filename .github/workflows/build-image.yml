@@ -1,7 +1,7 @@
-# Build Docker Image and push to GHCR
+# Build Docker Image — Three variants
 # =====================================
-# Triggers automatically when a new ZeroClaw binary release
-# is published, or manually to build a specific version.
+# Triggers when a new ZeroClaw binary release is published,
+# or manually. Each variant gets its own image tag.
 
 name: Build Docker Image
 
@@ -14,10 +14,6 @@ on:
         description: 'ZeroClaw version tag (e.g. v0.8.0-beta-2)'
         required: true
         type: string
-      image_tag:
-        description: 'Docker image tag (default: same as version)'
-        required: false
-        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -25,12 +21,23 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and push Docker image
+    name: ${{ matrix.variant.label }}
     runs-on: ubuntu-latest
-
+    continue-on-error: true
     permissions:
       contents: read
       packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: minimal
+            label: "A — Minimal"
+          - name: default-nochan
+            label: "B — Default-NoChan"
+          - name: default-feishu
+            label: "C — Default+Feishu"
 
     steps:
       - name: Checkout repo
@@ -40,15 +47,13 @@ jobs:
         id: version
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            # Extract version from release tag: zeroclaw-daemon-v0.8.0-beta-2 → v0.8.0-beta-2
             TAG="${{ github.event.release.tag_name }}"
             VERSION="${TAG#zeroclaw-daemon-}"
           else
             VERSION="${{ github.event.inputs.version }}"
           fi
-          IMAGE_TAG="${{ github.event.inputs.image_tag || VERSION }}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "variant=${{ matrix.variant.name }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,8 +72,9 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ steps.version.outputs.version }}
+            VARIANT=${{ steps.version.outputs.variant }}
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.variant }}-latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.variant }}-${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -14,11 +14,13 @@
 #     zeroclaw-full
 
 ARG VERSION=v0.8.0-beta-2
+ARG VARIANT=default-feishu
 ARG REPO=lsynpy/zeroclaw-images
 
 FROM debian:trixie-slim
 
 ARG VERSION
+ARG VARIANT
 ARG REPO
 
 # ── locale / tzdata (non-interactive) ──
@@ -42,7 +44,7 @@ RUN apt-get update && apt-get install -y \
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # ── download pre-compiled binary from our release ──
-RUN curl -sL "https://github.com/${REPO}/releases/download/zeroclaw-daemon-${VERSION}/zeroclaw-daemon" \
+RUN curl -sL "https://github.com/${REPO}/releases/download/zeroclaw-daemon-${VERSION}/zeroclaw-daemon-${VARIANT}" \
     -o /usr/local/bin/zeroclaw-daemon \
     && chmod +x /usr/local/bin/zeroclaw-daemon
 

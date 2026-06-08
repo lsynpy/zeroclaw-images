@@ -1,77 +1,91 @@
 # ZeroClaw Images
 
-**Pre-built ZeroClaw Docker images** with extra tools, cross-compiled for ARM64.
+**Pre-built ZeroClaw Docker images** with extra tools, cross-compiled
+for ARM64 via GitHub Actions.
 
-This repo **does not contain ZeroClaw source code**. It downloads the official source at build time, cross-compiles it on CI, then builds a Docker image with the binary plus essential tools.
+This repo contains **no ZeroClaw source code**. CI clones the official
+source, cross-compiles three variants, and builds Docker images.
 
-## Repo structure
+## The Three Variants
 
-```
-.github/workflows/
-├── cross-compile.yml     # Cross-compile zeroclaw-daemon → release asset
-└── build-image.yml        # Build Docker image → push to GHCR
+| # | Variant | Features | Binary Size | Profile |
+|---|---------|----------|-------------|---------|
+| **A** | `minimal` | `agent-runtime`, `gateway`, `channel-lark` | — | `ci` |
+| **B** | `default-nochan` | default subsystems + `channel-lark`, no other channels | — | `ci` |
+| **C** | `default-feishu` | official default + `channel-lark` | — | `ci` |
 
-images/zeroclaw-full/
-├── Dockerfile
-├── entrypoint.sh
-└── config.yaml.example
+After the first build, check the [releases page][releases] for actual sizes.
 
-Makefile                   # Local dev helpers
-```
-
-## How it works
+## How It Works
 
 ```
 GitHub Actions (x86_64 runner)
-    │  cross-compile aarch64 binary
-    ▼
-Our release asset (zeroclaw-daemon-v0.x.x)
-    │  curl download at Docker build time
-    ▼
-ghcr.io/lsynpy/zeroclaw-full:latest
-    (debian slim + tools + binary)
+  │  cross-compile (3 variants in parallel)
+  ▼
+GitHub Release: zeroclaw-daemon-v0.8.0-beta-2
+  ├─ zeroclaw-daemon-minimal
+  ├─ zeroclaw-daemon-default-nochan
+  └─ zeroclaw-daemon-default-feishu
+      │  curl download at Docker build time
+      ▼
+ghcr.io/lsynpy/zeroclaw-full:{variant}-latest
 ```
 
-## Usage
+## Quick Start
 
-### Quick start
+Pick a variant and run:
 
 ```bash
 docker run -d --name zeroclaw \
   -v /path/to/config.yaml:/etc/zeroclaw/config.yaml \
-  ghcr.io/lsynpy/zeroclaw-full:latest
-```
-
-### Build locally
-
-```bash
-make build VERSION=v0.8.0-beta-2
+  ghcr.io/lsynpy/zeroclaw-full:default-feishu-latest
 ```
 
 ## CI Pipeline
 
-| Step | Trigger | Output |
-|------|---------|--------|
-| **Cross-compile** | Manual `workflow_dispatch` | Binary asset in GitHub Release |
-| **Build image** | New release published  or manual | Docker image on GHCR |
-
-To start a build:
+### 1. Cross-Compile
 
 ```bash
-# 1. Cross-compile (takes ~60-90 min first time)
 gh workflow run cross-compile.yml -f version=v0.8.0-beta-2
+```
 
-# 2. Wait for it to finish → binary uploaded to release
+Runs **three jobs in parallel**. Each compiles its variant, then a
+consolidation job publishes all binaries to one release with a summary
+table.
 
-# 3. Build Docker image (takes ~2 min)
+### 2. Build Docker Image
+
+Auto-triggers when a release is published, or manually:
+
+```bash
 gh workflow run build-image.yml -f version=v0.8.0-beta-2
 ```
 
-## Version updates
+Builds three images in parallel, tagged as:
 
-When a new ZeroClaw version is released:
+- `ghcr.io/lsynpy/zeroclaw-full:minimal-latest`
+- `ghcr.io/lsynpy/zeroclaw-full:default-nochan-latest`
+- `ghcr.io/lsynpy/zeroclaw-full:default-feishu-latest`
+
+## Testing on JDC
+
+After the release is published:
 
 ```bash
-# Change version
-gh workflow run cross-compile.yml -f version=v0.9.0
+# Download a specific variant
+gh release download zeroclaw-daemon-v0.8.0-beta-2 \
+  -p zeroclaw-daemon-minimal \
+  -o ./zeroclaw-daemon && chmod +x ./zeroclaw-daemon
+
+# Or pull a Docker image
+docker pull ghcr.io/lsynpy/zeroclaw-full:minimal-latest
 ```
+
+## Version Updates
+
+```bash
+gh workflow run cross-compile.yml -f version=v0.9.0
+gh workflow run build-image.yml -f version=v0.9.0
+```
+
+[releases]: https://github.com/lsynpy/zeroclaw-images/releases
