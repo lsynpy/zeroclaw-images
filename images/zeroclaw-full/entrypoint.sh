@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# ── entrypoint for zeroclaw-daemon ──
+# ── entrypoint for zeroclaw ──
 # If no config is mounted, generate a minimal one.
 # Then exec the daemon so signals propagate correctly.
 
@@ -13,4 +13,4 @@ if [ ! -f "$CONFIG_PATH" ]; then
     echo "[entrypoint] Using default config (may need manual setup)."
 fi
 
-exec zeroclaw-daemon --config "$CONFIG_PATH" "$@"
+exec zeroclaw --config "$CONFIG_PATH" "$@"

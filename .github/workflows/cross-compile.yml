@@ -79,13 +79,13 @@ jobs:
           # Build with ci profile (fastest: lto=thin, codegen-units=16)
           cross build --profile ci \
             --target aarch64-unknown-linux-gnu \
-            --bin zeroclaw-daemon \
+            --bin zeroclaw \
             --no-default-features \
             --features "${FEATURES}"
 
           END=$(date +%s)
           DURATION=$((END - START))
-          BINARY_SIZE=$(stat -c%s target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon)
+          BINARY_SIZE=$(stat -c%s target/aarch64-unknown-linux-gnu/ci/zeroclaw)
           BINARY_SIZE_HUMAN=$(numfmt --to=iec $BINARY_SIZE)
 
           echo "duration=${DURATION}" >> "$GITHUB_OUTPUT"
@@ -94,14 +94,14 @@ jobs:
 
           # Save binary with variant name
           mkdir -p /tmp/artifact
-          cp target/aarch64-unknown-linux-gnu/ci/zeroclaw-daemon \
-            /tmp/artifact/zeroclaw-daemon-${VARIANT}
+          cp target/aarch64-unknown-linux-gnu/ci/zeroclaw \
+            /tmp/artifact/zeroclaw-${VARIANT}
 
       - name: Upload variant artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zeroclaw-daemon-${{ matrix.variant.name }}-${{ github.event.inputs.version }}
-          path: /tmp/artifact/zeroclaw-daemon-${{ matrix.variant.name }}
+          name: zeroclaw-${{ matrix.variant.name }}-${{ github.event.inputs.version }}
+          path: /tmp/artifact/zeroclaw-${{ matrix.variant.name }}
 
       - name: Print timing
         run: |
@@ -136,7 +136,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          RELEASE_TAG="zeroclaw-daemon-${VERSION}"
+          RELEASE_TAG="zeroclaw-${VERSION}"
 
           # Build summary table
           SUMMARY="## Build Results\n\n"
@@ -144,7 +144,7 @@ jobs:
           SUMMARY+="|---------|----------|------|-------------|--------|\n"
 
           for f in /tmp/binaries/*; do
-            VARIANT=$(basename "$f" | sed 's/zeroclaw-daemon-//')
+            VARIANT=$(basename "$f" | sed 's/zeroclaw-//')
             SIZE=$(stat -c%s "$f" | numfmt --to=iec)
 
             # Map variant name to label + features
@@ -208,7 +208,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo '```bash' >> "$GITHUB_STEP_SUMMARY"
           echo "# Download a variant and test locally" >> "$GITHUB_STEP_SUMMARY"
-          echo "gh release download zeroclaw-daemon-${VERSION} \\" >> "$GITHUB_STEP_SUMMARY"
-          echo "  -p zeroclaw-daemon-minimal \\" >> "$GITHUB_STEP_SUMMARY"
-          echo "  -o ./zeroclaw-daemon && chmod +x ./zeroclaw-daemon" >> "$GITHUB_STEP_SUMMARY"
+          echo "gh release download zeroclaw-${VERSION} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -p zeroclaw-minimal \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -o ./zeroclaw && chmod +x ./zeroclaw" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

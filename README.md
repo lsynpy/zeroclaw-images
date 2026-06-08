@@ -22,10 +22,10 @@ After the first build, check the [releases page][releases] for actual sizes.
 GitHub Actions (x86_64 runner)
   │  cross-compile (3 variants in parallel)
   ▼
-GitHub Release: zeroclaw-daemon-v0.8.0-beta-2
-  ├─ zeroclaw-daemon-minimal
-  ├─ zeroclaw-daemon-default-nochan
-  └─ zeroclaw-daemon-default-feishu
+GitHub Release: zeroclaw-v0.8.0-beta-2
+  ├─ zeroclaw-minimal
+  ├─ zeroclaw-default-nochan
+  └─ zeroclaw-default-feishu
       │  curl download at Docker build time
       ▼
 ghcr.io/lsynpy/zeroclaw-full:{variant}-latest
@@ -73,9 +73,9 @@ After the release is published:
 
 ```bash
 # Download a specific variant
-gh release download zeroclaw-daemon-v0.8.0-beta-2 \
-  -p zeroclaw-daemon-minimal \
-  -o ./zeroclaw-daemon && chmod +x ./zeroclaw-daemon
+gh release download zeroclaw-v0.8.0-beta-2 \
+  -p zeroclaw-minimal \
+  -o ./zeroclaw && chmod +x ./zeroclaw
 
 # Or pull a Docker image
 docker pull ghcr.io/lsynpy/zeroclaw-full:minimal-latest

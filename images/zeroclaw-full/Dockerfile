@@ -1,6 +1,6 @@
 # ZeroClaw Full Image
 # ====================
-# Minimal debian base + pre-compiled zeroclaw-daemon + essential tools.
+# Minimal debian base + pre-compiled zeroclaw + essential tools.
 # Binary is downloaded from our own release (cross-compiled on CI).
 #
 # Build:
@@ -44,9 +44,9 @@ RUN apt-get update && apt-get install -y \
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # ── download pre-compiled binary from our release ──
-RUN curl -sL "https://github.com/${REPO}/releases/download/zeroclaw-daemon-${VERSION}/zeroclaw-daemon-${VARIANT}" \
-    -o /usr/local/bin/zeroclaw-daemon \
-    && chmod +x /usr/local/bin/zeroclaw-daemon
+RUN curl -sL "https://github.com/${REPO}/releases/download/zeroclaw-${VERSION}/zeroclaw-${VARIANT}" \
+    -o /usr/local/bin/zeroclaw \
+    && chmod +x /usr/local/bin/zeroclaw
 
 # ── entrypoint ──
 COPY entrypoint.sh /entrypoint.sh
