@@ -1,0 +1,9 @@
+# No build artifacts in this repo — everything comes from CI
+*.tar.gz
+*.zip
+*.tmp
+
+# Editor
+.DS_Store
+*.swp
+*.swo

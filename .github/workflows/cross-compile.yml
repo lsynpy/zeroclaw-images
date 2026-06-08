@@ -1,0 +1,99 @@
+# Cross-compile ZeroClaw daemon for aarch64
+# ==========================================
+# Downloads ZeroClaw source at the specified tag,
+# cross-compiles for ARM64, and uploads the binary
+# to our own releases so Dockerfiles can fetch it.
+#
+# Trigger: manual (workflow_dispatch) with a version tag.
+#          Also runs on pushes to main that change this file.
+
+name: Cross-Compile ZeroClaw
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'ZeroClaw version tag to compile (e.g. v0.8.0-beta-2)'
+        required: true
+        type: string
+      features:
+        description: 'Cargo feature flags (comma-separated)'
+        required: false
+        default: 'lark,telegram,discord,signal,matrix'
+
+jobs:
+  compile:
+    name: Build zeroclaw-daemon (aarch64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build zeroclaw-daemon
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          FEATURES="${{ github.event.inputs.features }}"
+
+          echo "Building ZeroClaw ${VERSION} with features: ${FEATURES}"
+          echo "Target: aarch64-unknown-linux-gnu"
+
+          git clone --depth 1 --branch "${VERSION}" \
+            https://github.com/zeroclaw-labs/zeroclaw.git /tmp/zeroclaw
+
+          cd /tmp/zeroclaw
+
+          cross build --release \
+            --target aarch64-unknown-linux-gnu \
+            --bin zeroclaw-daemon \
+            --features "${FEATURES//,/ }"
+
+          mkdir -p /tmp/artifact
+          cp target/aarch64-unknown-linux-gnu/release/zeroclaw-daemon \
+            /tmp/artifact/zeroclaw-daemon
+
+      - name: Upload binary as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeroclaw-daemon-${{ github.event.inputs.version }}
+          path: /tmp/artifact/zeroclaw-daemon
+
+      - name: Create or update release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          RELEASE_TAG="zeroclaw-daemon-${VERSION}"
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+          NOTES="Cross-compiled zeroclaw-daemon for aarch64. Features: ${{ github.event.inputs.features }}."
+
+          gh release view "${RELEASE_TAG}" 2>/dev/null || \
+            gh release create "${RELEASE_TAG}" \
+              --title "ZeroClaw daemon ${VERSION}" \
+              --notes "${NOTES}"
+
+          gh release upload "${RELEASE_TAG}" \
+            /tmp/artifact/zeroclaw-daemon --clobber
+
+      - name: Summarize
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          echo "## ✅ Cross-compile complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | \`${VERSION}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Features | \`${{ github.event.inputs.features }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Binary size | $(du -h /tmp/artifact/zeroclaw-daemon | cut -f1) |" >> "$GITHUB_STEP_SUMMARY"

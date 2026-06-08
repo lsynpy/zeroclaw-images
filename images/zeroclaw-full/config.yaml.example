@@ -1,0 +1,32 @@
+# ZeroClaw config template
+# Copy this and mount it to /etc/zeroclaw/config.yaml
+# Edit as needed before first run.
+
+daemon:
+  listen: "0.0.0.0:8080"
+  proxy:
+    enabled: false
+
+# Channels
+channels:
+  lark:
+    enabled: true
+    app_id: "${LARK_APP_ID}"
+    app_secret: "${LARK_APP_SECRET}"
+    verification_token: "${LARK_VERIFICATION_TOKEN}"
+    peer_groups:
+      external_peers: ["*"]
+
+  # telegram:
+  #   enabled: false
+  #   bot_token: "${TELEGRAM_BOT_TOKEN}"
+
+# Providers
+providers:
+  openrouter:
+    api_key: "${OPENROUTER_API_KEY}"
+    default_model: "openai/gpt-4o"
+
+# Memory
+memory:
+  path: "/var/lib/zeroclaw/memory.json"
