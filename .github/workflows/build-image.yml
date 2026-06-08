@@ -17,7 +17,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: zeroclaw-full
+  IMAGE_NAME: zeroclaw-images-build
 
 jobs:
   build-and-push:
