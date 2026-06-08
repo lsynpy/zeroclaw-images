@@ -5,12 +5,12 @@ set -e
 # If no config is mounted, generate a minimal one.
 # Then exec the daemon so signals propagate correctly.
 
-CONFIG_PATH="${ZEROCLAW_CONFIG:-/etc/zeroclaw/config.yaml}"
+CONFIG_DIR="${ZEROCLAW_CONFIG_DIR:-/zeroclaw-data/.zeroclaw}"
 
-if [ ! -f "$CONFIG_PATH" ]; then
-    echo "[entrypoint] No config found at $CONFIG_PATH"
-    echo "[entrypoint] Mount one or set ZEROCLAW_CONFIG to a config file path."
+if [ ! -d "$CONFIG_DIR" ]; then
+    echo "[entrypoint] No config dir found at $CONFIG_DIR"
+    echo "[entrypoint] Mount a volume with .zeroclaw/ at /zeroclaw-data/ or set ZEROCLAW_CONFIG_DIR."
     echo "[entrypoint] Using default config (may need manual setup)."
 fi
 
-exec zeroclaw-daemon --config "$CONFIG_PATH" "$@"
+exec zeroclaw-daemon --config-dir "$CONFIG_DIR" "$@"
