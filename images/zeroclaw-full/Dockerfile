@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y \
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # ── Rust-based Python tools (via pip — pre-compiled Rust binaries) ──
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --break-system-packages --no-cache-dir \
     ruff \
     ty \
     rumdl
