@@ -13,4 +13,8 @@ if [ ! -d "$CONFIG_DIR" ]; then
     echo "[entrypoint] Using default config (may need manual setup)."
 fi
 
-exec zeroclaw-daemon --config-dir "$CONFIG_DIR" "$@"
+if [ $# -eq 0 ]; then
+    exec zeroclaw-daemon --config-dir "$CONFIG_DIR" daemon
+else
+    exec zeroclaw-daemon --config-dir "$CONFIG_DIR" "$@"
+fi
