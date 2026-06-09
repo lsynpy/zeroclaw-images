@@ -67,7 +67,7 @@ RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;
 # typos-cli — spell checker
 RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; esac) \
     && curl -sL "https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-${ARCH}-unknown-linux-musl.tar.gz" \
-    | tar xz -C /usr/local/bin typos
+    | tar xz -C /usr/local/bin ./typos
 
 # gh CLI — GitHub CLI
 RUN curl -sL "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_${TARGETARCH}.tar.gz" \
