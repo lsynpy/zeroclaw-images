@@ -54,15 +54,15 @@ RUN pip3 install --break-system-packages --no-cache-dir \
 
 # ── Pre-compiled Rust CLI tools (download from GitHub releases) ──
 
-# ripgrep (rg) — code search
-RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; esac) \
-    && curl -sL "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-${ARCH}-unknown-linux-gnu.tar.gz" \
-    | tar xz -C /usr/local/bin --strip-components=1 "ripgrep-14.1.1-${ARCH}-unknown-linux-gnu/rg"
+# ripgrep (rg) — code search (musl for x86_64, gnu for aarch64)
+RUN SUFFIX=$(case "$TARGETARCH" in amd64) echo "x86_64-unknown-linux-musl" ;; arm64) echo "aarch64-unknown-linux-gnu" ;; esac) \
+    && curl -sL "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-${SUFFIX}.tar.gz" \
+    | tar xz -C /usr/local/bin --strip-components=1 "ripgrep-15.1.0-${SUFFIX}/rg"
 
 # fd — faster find
 RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; esac) \
-    && curl -sL "https://github.com/sharkdp/fd/releases/download/v10.2.0/fd-v10.2.0-${ARCH}-unknown-linux-gnu.tar.gz" \
-    | tar xz -C /usr/local/bin --strip-components=1 "fd-v10.2.0-${ARCH}-unknown-linux-gnu/fd"
+    && curl -sL "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-${ARCH}-unknown-linux-gnu.tar.gz" \
+    | tar xz -C /usr/local/bin --strip-components=1 "fd-v10.4.2-${ARCH}-unknown-linux-gnu/fd"
 
 # typos-cli — spell checker
 RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; esac) \
@@ -70,8 +70,8 @@ RUN ARCH=$(case "$TARGETARCH" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;
     | tar xz -C /usr/local/bin typos
 
 # gh CLI — GitHub CLI
-RUN curl -sL "https://github.com/cli/cli/releases/download/v2.70.0/gh_2.70.0_linux_${TARGETARCH}.tar.gz" \
-    | tar xz -C /usr/local/bin --strip-components=2 "gh_2.70.0_linux_${TARGETARCH}/bin/gh"
+RUN curl -sL "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_${TARGETARCH}.tar.gz" \
+    | tar xz -C /usr/local/bin --strip-components=2 "gh_2.93.0_linux_${TARGETARCH}/bin/gh"
 
 # ── download pre-compiled zeroclaw binary from our release ──
 RUN curl -sL "https://github.com/${REPO}/releases/download/zeroclaw-daemon-${VERSION}/zeroclaw-daemon-${VARIANT}" \
