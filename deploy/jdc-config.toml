@@ -1,0 +1,112 @@
+# ZeroClaw JDC deployment config (酱油)
+# Schema v3 — minimal-latest variant
+# Target: JDC (192.168.100.1), ARM64, ―network host
+
+schema_version = 3
+
+[gateway]
+port = 42617
+host = "[::]"
+allow_public_bind = true
+require_pairing = false
+
+[agents.zc]
+channels = ["lark.feishu", "feishu"]
+risk_profile = "yolo"
+model_provider = "opencode.go"
+runtime_profile = "unbounded"
+
+[providers.models.opencode.go]
+model = "deepseek-v4-flash"
+uri = "https://opencode.ai/zen/go/v1"
+api_key = "enc2:<your-encrypted-key>"
+wire_api = "chat_completions"
+
+[risk_profiles.yolo]
+block_high_risk_commands = false
+level = "full"
+require_approval_for_medium_risk = false
+sandbox_enabled = false
+workspace_only = false
+
+[runtime_profiles.unbounded]
+agentic = true
+agentic_timeout_secs = 1800
+compact_context = false
+context_aware_tools = true
+delegation_timeout_secs = 900
+keep_tool_context_turns = 8
+max_actions_per_hour = 0
+max_context_tokens = 128000
+max_cost_per_day_cents = 0
+max_delegation_depth = 8
+max_history_messages = 200
+max_system_prompt_chars = 64000
+max_tool_iterations = 100
+max_tool_result_chars = 64000
+memory_recall_limit = 10
+parallel_tools = true
+shell_timeout_secs = 600
+strict_tool_parsing = false
+
+[risk_profiles.yolo.delegation_policy]
+mode = "forbidden"
+
+[runtime_profiles.unbounded.context_compression]
+enabled = true
+identifier_policy = "strict"
+max_passes = 3
+protect_first_n = 3
+protect_last_n = 4
+source_max_chars = 50000
+summary_max_chars = 4000
+threshold_ratio = 0.5
+timeout_secs = 60
+tool_result_retrim_chars = 2000
+
+[runtime_profiles.unbounded.eval]
+enabled = false
+max_retries = 1
+min_quality_score = 0.5
+
+[runtime_profiles.unbounded.history_pruning]
+collapse_tool_results = true
+enabled = false
+keep_recent = 4
+max_tokens = 8192
+
+[runtime_profiles.unbounded.thinking]
+default_level = "medium"
+native_thinking = false
+
+[runtime_profiles.unbounded.tool_receipts]
+enabled = false
+inject_system_prompt = true
+show_in_response = false
+
+[channels.lark.feishu]
+allowed_users = ["*"]
+app_id = "cli_a92d50e8e03bdbc3"
+app_secret = "<your-app-secret>"
+enabled = true
+mention_only = false
+receive_mode = "websocket"
+use_feishu = true
+group_reply = { allowed_sender_ids = ["*"] }
+
+[peer_groups.everyone]
+channel = "lark.feishu"
+agents = ["zc"]
+external_peers = ["*"]
+
+[observability]
+backend = "none"
+runtime_trace_mode = "rolling"
+runtime_trace_path = "state/runtime-trace.jsonl"
+runtime_trace_max_entries = 50000
+
+[onboard_state]
+quickstart_completed = true
+
+[memory]
+backend = "sqlite.sqlite"
